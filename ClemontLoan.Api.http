@@ -1,0 +1,90 @@
+@baseUrl = http://localhost:5088
+
+###
+# ALUR AUTENTIKASI DAN ANTIFORGERY COOKIE:
+# 1. Frontend atau client pertama kali memanggil `GET /api/auth/csrf`.
+# 2. Server mengembalikan 204 No Content dan menyertakan cookie:
+#    - `.AspNetCore.Antiforgery` (Cookie HttpOnly berisi token server)
+#    - `XSRF-TOKEN` (Cookie non-HttpOnly yang dibaca oleh HttpClient Angular).
+# 3. Untuk setiap request yang memodifikasi state (POST /login, POST /logout, POST /loan-applications):
+#    - Client menyertakan cookie `.AspNetCore.Antiforgery` dan cookie sesi `.ClemontLoan.Auth` secara otomatis (withCredentials: true).
+#    - Client membaca nilai cookie `XSRF-TOKEN` dan mengirimkannya pada HTTP header `X-XSRF-TOKEN`.
+#    - Server memvalidasi kecocokan token antara cookie dan header melalui filter [ValidateAntiForgeryToken].
+###
+
+### 1. Dapatkan Antiforgery Cookie (GET /api/auth/csrf)
+# Jalankan request ini terlebih dahulu untuk mendapatkan cookie XSRF-TOKEN
+GET {{baseUrl}}/api/auth/csrf
+
+### 2. Login dengan Kredensial Salah (Harus mengembalikan 401 Unauthorized)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+
+{
+  "email": "staff@clemont.test",
+  "password": "PasswordSalah123!"
+}
+
+### 3. Login dengan Kredensial Benar (Seed Akun Demo)
+# Simpan nilai token CSRF dari cookie XSRF-TOKEN ke variabel request jika menggunakan REST client tool
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+
+{
+  "email": "staff@clemont.test",
+  "password": "Belajar123!"
+}
+
+### 4. Periksa Sesi Pengguna Aktif (GET /api/auth/me)
+GET {{baseUrl}}/api/auth/me
+
+### 5. Mengambil Daftar Pengajuan Pinjaman (Terpaginasi & Diurutkan Terbaru)
+GET {{baseUrl}}/api/loan-applications?page=1&pageSize=10
+
+### 6. Cari Pengajuan Pinjaman berdasarkan Kata Kunci
+GET {{baseUrl}}/api/loan-applications?search=Fauzi&page=1&pageSize=10
+
+### 7. Ambil Detail Pengajuan Berdasarkan ID
+GET {{baseUrl}}/api/loan-applications/la-seed-001
+
+### 8. Ambil Detail Pengajuan yang Tidak Ada (Harus mengembalikan 404 ProblemDetails)
+GET {{baseUrl}}/api/loan-applications/la-tidak-ada
+
+### 9. Buat Pengajuan Pinjaman Baru (Validasi Gagal - contoh data tidak valid)
+POST {{baseUrl}}/api/loan-applications
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+
+{
+  "fullName": "Jo",
+  "nationalId": "12345",
+  "phone": "081",
+  "email": "email-salah",
+  "amount": 500000,
+  "tenorMonths": 18,
+  "purpose": "Pendek"
+}
+
+### 10. Buat Pengajuan Pinjaman Baru (Berhasil - 201 Created)
+POST {{baseUrl}}/api/loan-applications
+Content-Type: application/json
+X-XSRF-TOKEN: {{csrfToken}}
+
+{
+  "fullName": "Ahmad Fauzi",
+  "nationalId": "3171012345670005",
+  "phone": "082198765432",
+  "email": "ahmad.fauzi@contoh.id",
+  "amount": 25000000,
+  "tenorMonths": 24,
+  "purpose": "Renovasi tempat usaha fotokopi dan ATK"
+}
+
+### 11. Logout (Menghapus Sesi Autentikasi)
+POST {{baseUrl}}/api/auth/logout
+X-XSRF-TOKEN: {{csrfToken}}
+
+### 12. Verifikasi GET /api/auth/me setelah Logout (Harus mengembalikan 401 Unauthorized)
+GET {{baseUrl}}/api/auth/me
